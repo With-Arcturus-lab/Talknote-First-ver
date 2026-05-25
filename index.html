@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8f4ec" />
+    <title>TalkNote</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>TalkNote</h1>
+        </div>
+        <button class="icon-button" type="button" id="openSettings" aria-label="設定">
+          <span aria-hidden="true">⚙</span>
+        </button>
+      </header>
+
+      <main>
+        <section class="screen active" id="screenTalk" aria-labelledby="talkTitle">
+          <div class="panel compose-panel">
+            <div class="panel-head">
+              <h2 id="talkTitle">伝える</h2>
+              <button class="ghost-button" type="button" id="clearMessage">消す</button>
+            </div>
+
+            <textarea
+              id="messageInput"
+              rows="5"
+              placeholder="ここに伝えたいこと"
+              autocomplete="off"
+            ></textarea>
+
+            <div class="action-grid">
+              <button class="primary-button" type="button" id="showMessage">伝える</button>
+              <button class="secondary-button" type="button" id="saveMessage">記録だけ残す</button>
+            </div>
+          </div>
+
+          <div class="quick-row" aria-label="すぐ使う返事">
+            <button type="button" class="quick-answer" data-phrase="はい">はい</button>
+            <button type="button" class="quick-answer" data-phrase="いいえ">いいえ</button>
+            <button type="button" class="quick-answer" data-phrase="待ってください">待って</button>
+            <button type="button" class="quick-answer" data-phrase="もう一度お願いします">もう一度</button>
+          </div>
+
+          <section class="panel" aria-labelledby="statusTitle">
+            <div class="panel-head">
+              <h2 id="statusTitle">体調</h2>
+              <button class="secondary-button compact" type="button" id="saveStatus">体調を記録</button>
+            </div>
+
+            <div class="status-grid" id="statusGrid"></div>
+
+            <div class="status-chip-title">当てはまること</div>
+            <div class="chip-group" id="statusChips" aria-label="体調メモ"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="phraseTitle">
+            <div class="panel-head">
+              <h2 id="phraseTitle">定型文</h2>
+              <div class="segmented" role="tablist" aria-label="定型文カテゴリ">
+                <button class="segment active" type="button" data-category="body">体調</button>
+                <button class="segment" type="button" data-category="medical">診察</button>
+                <button class="segment" type="button" data-category="feeling">気持ち</button>
+              </div>
+            </div>
+            <div class="phrase-grid" id="phraseGrid"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="screenCalendar" aria-labelledby="calendarTitle">
+          <section class="panel calendar-panel">
+            <div class="panel-head">
+              <h2 id="calendarTitle">カレンダー</h2>
+              <div class="button-row">
+                <button class="ghost-button compact" type="button" id="prevMonth" aria-label="前の月">‹</button>
+                <strong class="month-title" id="monthTitle"></strong>
+                <button class="ghost-button compact" type="button" id="nextMonth" aria-label="次の月">›</button>
+              </div>
+            </div>
+
+            <div class="weekday-row" aria-hidden="true">
+              <span>日</span>
+              <span>月</span>
+              <span>火</span>
+              <span>水</span>
+              <span>木</span>
+              <span>金</span>
+              <span>土</span>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 id="selectedDateTitle">予定を追加</h2>
+              <button class="secondary-button compact" type="button" id="newEvent">新規</button>
+            </div>
+
+            <div class="event-form">
+              <input type="hidden" id="editingEventId" />
+              <div class="visit-row">
+                <label>
+                  <span>日付</span>
+                  <input id="eventDate" type="date" />
+                </label>
+                <label id="eventTimeField">
+                  <span>時間</span>
+                  <input id="eventTime" type="time" />
+                </label>
+              </div>
+              <div class="visit-row">
+                <label>
+                  <span>予定</span>
+                  <select id="eventTitle">
+                    <option>通院</option>
+                    <option>訪問看護</option>
+                    <option>ヘルパー</option>
+                    <option>リハビリ</option>
+                    <option>家族</option>
+                    <option>誕生日</option>
+                    <option>その他</option>
+                  </select>
+                </label>
+                <label class="care-field">
+                  <span>相手・場所</span>
+                  <input id="eventPlace" type="text" placeholder="病院名、担当者など" autocomplete="off" />
+                </label>
+              </div>
+              <div class="visit-row life-field">
+                <label>
+                  <span>予定名</span>
+                  <input id="eventName" type="text" placeholder="誕生日、家族が来る、外出など" autocomplete="off" />
+                </label>
+                <label>
+                  <span>繰り返し</span>
+                  <select id="eventRepeat">
+                    <option value="none">なし</option>
+                    <option value="daily">毎日</option>
+                    <option value="weekly">毎週</option>
+                    <option value="monthly">毎月</option>
+                    <option value="yearly">毎年</option>
+                  </select>
+                </label>
+              </div>
+              <label class="toggle-line life-field">
+                <span>終日</span>
+                <input type="checkbox" id="eventAllDay" />
+              </label>
+              <button class="primary-button" type="button" id="saveEvent">予定を保存</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>聞きたいこと</h2>
+              <button class="secondary-button compact" type="button" id="clearQaForm">新規</button>
+            </div>
+            <div class="qa-form">
+              <input id="editingQaId" type="hidden" />
+              <div class="visit-row">
+                <label>
+                  <span>カテゴリ</span>
+                  <select id="qaCategory">
+                    <option>通院</option>
+                    <option>訪問看護</option>
+                    <option>ヘルパー</option>
+                    <option>リハビリ</option>
+                    <option>家族</option>
+                    <option>その他</option>
+                  </select>
+                </label>
+                <label>
+                  <span>相手・場所</span>
+                  <input id="qaPerson" type="text" placeholder="病院名、担当者など" autocomplete="off" />
+                </label>
+              </div>
+              <input id="qaDate" type="hidden" />
+              <label>
+                <span>Q 聞きたいこと</span>
+                <textarea id="qaQuestion" rows="3" placeholder="あとで回答を残したい質問"></textarea>
+              </label>
+              <label>
+                <span>A 回答</span>
+                <textarea id="qaAnswer" rows="3" placeholder="聞いた回答、決まったこと"></textarea>
+              </label>
+              <label>
+                <span>メモ</span>
+                <textarea id="qaMemo" rows="2" placeholder="補足メモ"></textarea>
+              </label>
+              <button class="primary-button" type="button" id="saveQaRecord">Q&Aを保存</button>
+            </div>
+          </section>
+
+          <section class="panel day-panel">
+            <h2>この日の履歴</h2>
+            <div class="day-list" id="dayList" aria-live="polite"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="screenLog" aria-labelledby="logTitle">
+          <section class="panel">
+            <div class="panel-head">
+              <h2 id="logTitle">記録</h2>
+            </div>
+            <div class="visit-row">
+              <label>
+                <span>検索</span>
+                <input id="recordSearch" type="search" placeholder="呼吸、薬、痛みなど" autocomplete="off" />
+              </label>
+              <label>
+                <span>種類</span>
+                <select id="recordFilter">
+                  <option value="all">すべて</option>
+                  <option value="qa">聞きたいこと・回答</option>
+                  <option value="answered">回答あり</option>
+                  <option value="message">伝えたこと</option>
+                  <option value="status">体調</option>
+                  <option value="event">予定</option>
+                  <option value="diary">日記</option>
+                </select>
+              </label>
+            </div>
+            <label class="wide-label">
+              <span>日付</span>
+              <input id="recordDate" type="date" />
+            </label>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>日記・振り返り</h2>
+              <button class="secondary-button compact" type="button" id="generateFeedback">下書き</button>
+            </div>
+            <div class="qa-form">
+              <input id="editingDiaryId" type="hidden" />
+              <input id="diaryDate" type="hidden" />
+              <label>
+                <span>今日のメモ</span>
+                <textarea id="diaryText" rows="4" placeholder="できたこと、しんどかったこと、家族や支援者へのメモ"></textarea>
+              </label>
+              <label>
+                <span>フィードバック</span>
+                <textarea id="diaryFeedback" rows="4" placeholder="下書きボタンで、その日の記録をもとに整理します"></textarea>
+              </label>
+              <button class="primary-button" type="button" id="saveDiary">日記を保存</button>
+            </div>
+          </section>
+
+          <div class="qa-list" id="recordResults" aria-live="polite"></div>
+        </section>
+
+        <section class="screen" id="screenSettings" aria-labelledby="settingsTitle">
+          <section class="panel notice-panel" aria-labelledby="noticeTitle">
+            <h2 id="noticeTitle">このアプリについて</h2>
+            <div class="notice-text">
+              <p>TalkNoteは、会話、予定、体調、聞きたいこと、回答、日記を記録するための補助ツールです。</p>
+              <p>医療上の診断、治療方針の決定、緊急時の判断を行うものではありません。体調の急変や緊急時は、主治医、訪問看護、救急などの指示を優先してください。</p>
+              <p>入力した内容は、この端末のブラウザ内に保存されます。GitHubや開発者のサーバーには送信されません。</p>
+              <p>ブラウザのデータ削除、端末変更、故障などで記録が消えることがあります。必要に応じて、設定画面からバックアップを書き出してください。</p>
+              <p>このアプリの画面はGitHub Pages上で公開されます。URLを知っている人はアプリを開けますが、各利用者の記録はその端末内に保存されます。</p>
+              <p>バックアップファイルには個人的な記録が含まれるため、保存先や共有相手に注意してください。</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2 id="settingsTitle">設定</h2>
+            <div class="setting-list">
+              <div class="setting-block">
+                <span class="setting-label">テーマ</span>
+                <div class="segmented theme-segments" role="group" aria-label="テーマ">
+                  <button class="segment active" type="button" data-theme="default">標準</button>
+                  <button class="segment" type="button" data-theme="light">白</button>
+                  <button class="segment" type="button" data-theme="dark">黒</button>
+                </div>
+              </div>
+              <label class="toggle-line">
+                <span>大きな文字</span>
+                <input type="checkbox" id="largeTextToggle" />
+              </label>
+              <label class="toggle-line">
+                <span>高コントラスト</span>
+                <input type="checkbox" id="contrastToggle" />
+              </label>
+              <label class="toggle-line">
+                <span>表示時に自動記録</span>
+                <input type="checkbox" id="autoSaveToggle" checked />
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>体調の項目を編集</h2>
+              <div class="button-row">
+                <button class="ghost-button compact" type="button" id="cancelStatusScaleEdit">新規</button>
+                <button class="secondary-button compact" type="button" id="saveStatusScale">保存</button>
+              </div>
+            </div>
+            <label class="wide-label">
+              <span>項目名</span>
+              <input id="customStatusScale" type="text" placeholder="例: 眠気、気分、吐き気" autocomplete="off" />
+            </label>
+            <input id="editingStatusScaleId" type="hidden" />
+            <div class="phrase-manage-list" id="statusScaleManageList"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>当てはまることを編集</h2>
+              <div class="button-row">
+                <button class="ghost-button compact" type="button" id="cancelStatusMemoEdit">新規</button>
+                <button class="secondary-button compact" type="button" id="saveStatusMemo">保存</button>
+              </div>
+            </div>
+            <label class="wide-label">
+              <span>表示する内容</span>
+              <input id="customStatusMemo" type="text" placeholder="例: 眠れなかった、薬の相談" autocomplete="off" />
+            </label>
+            <input id="editingStatusMemoId" type="hidden" />
+            <div class="phrase-manage-list" id="statusMemoManageList"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>定型文を編集</h2>
+              <div class="button-row">
+                <button class="ghost-button compact" type="button" id="cancelPhraseEdit">新規</button>
+                <button class="secondary-button compact" type="button" id="saveCustomPhrase">保存</button>
+              </div>
+            </div>
+            <div class="visit-row">
+              <label>
+                <span>カテゴリ</span>
+                <select id="customCategory">
+                  <option value="body">体調</option>
+                  <option value="medical">診察</option>
+                  <option value="feeling">気持ち</option>
+                </select>
+              </label>
+              <label>
+                <span>文</span>
+                <input id="customPhrase" type="text" placeholder="よく使う文" autocomplete="off" />
+              </label>
+            </div>
+            <input id="editingPhraseId" type="hidden" />
+            <div class="phrase-manage-list" id="phraseManageList"></div>
+          </section>
+
+          <section class="panel">
+            <h2>バックアップ</h2>
+            <div class="action-grid">
+              <button class="secondary-button" type="button" id="exportBackup">バックアップを書き出す</button>
+              <button class="secondary-button" type="button" id="importBackup">バックアップを読み込む</button>
+            </div>
+            <button class="ghost-button backup-wide" type="button" id="exportReadable">記録をテキストで書き出す</button>
+            <input id="backupFileInput" type="file" accept="application/json,.json" hidden />
+          </section>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="画面切り替え">
+        <button class="nav-item active" type="button" data-screen="screenTalk">
+          <span aria-hidden="true">✎</span>
+          <span>伝える</span>
+        </button>
+        <button class="nav-item" type="button" data-screen="screenCalendar">
+          <span aria-hidden="true">□</span>
+          <span>カレンダー</span>
+        </button>
+        <button class="nav-item" type="button" data-screen="screenLog">
+          <span aria-hidden="true">≡</span>
+          <span>記録</span>
+        </button>
+      </nav>
+    </div>
+
+    <dialog id="displayDialog" class="display-dialog">
+      <div class="display-card">
+        <p class="display-label">見せる文</p>
+        <div class="display-text" id="displayText"></div>
+        <div class="display-actions">
+          <button class="secondary-button" type="button" id="recordDisplayed">記録だけ残す</button>
+          <button class="primary-button" type="button" id="closeDisplay">閉じる</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="logEditDialog" class="edit-dialog">
+      <div class="edit-card">
+        <h2 id="logEditTitle">記録を編集</h2>
+        <input id="editingLogId" type="hidden" />
+        <textarea id="logEditText" rows="7" placeholder="記録内容"></textarea>
+        <div class="display-actions">
+          <button class="secondary-button" type="button" id="cancelLogEdit">閉じる</button>
+          <button class="primary-button" type="button" id="saveLogEdit">保存</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
