@@ -95,6 +95,8 @@ const els = {
   phraseGrid: $("#phraseGrid"),
   saveStatus: $("#saveStatus"),
   editingQaId: $("#editingQaId"),
+  qaEventId: $("#qaEventId"),
+  qaContext: $("#qaContext"),
   qaCategory: $("#qaCategory"),
   qaDate: $("#qaDate"),
   qaPerson: $("#qaPerson"),
@@ -110,13 +112,13 @@ const els = {
   editingDiaryId: $("#editingDiaryId"),
   diaryDate: $("#diaryDate"),
   diaryText: $("#diaryText"),
-  diaryFeedback: $("#diaryFeedback"),
-  generateFeedback: $("#generateFeedback"),
   saveDiary: $("#saveDiary"),
   monthTitle: $("#monthTitle"),
   prevMonth: $("#prevMonth"),
   nextMonth: $("#nextMonth"),
   calendarGrid: $("#calendarGrid"),
+  dayDialog: $("#dayDialog"),
+  closeDayDialog: $("#closeDayDialog"),
   selectedDateTitle: $("#selectedDateTitle"),
   dayList: $("#dayList"),
   newEvent: $("#newEvent"),
@@ -171,8 +173,7 @@ function loadState() {
       theme: "default",
       largeText: false,
       highContrast: false,
-      autoSave: true,
-      feedbackPrompt: "医療者や家族に見せやすく、短く、次回聞きたいことがあれば最後にまとめる"
+      autoSave: true
     }
   };
 
@@ -204,6 +205,7 @@ function loadState() {
 function normalizeQaRecords(records) {
   return records.map((record) => ({
     id: record.id || createId(),
+    eventId: record.eventId || "",
     category: qaCategories.includes(record.category) ? record.category : "通院",
     date: record.date || toDateKey(new Date(record.createdAt || Date.now())),
     person: record.person || "",
@@ -220,7 +222,6 @@ function normalizeDiaryEntries(entries) {
     id: entry.id || createId(),
     date: entry.date || toDateKey(new Date(entry.createdAt || Date.now())),
     text: entry.text || "",
-    feedback: entry.feedback || "",
     createdAt: entry.createdAt || new Date().toISOString(),
     updatedAt: entry.updatedAt || entry.createdAt || new Date().toISOString()
   }));
@@ -336,8 +337,7 @@ function normalizeImportedState(source = {}) {
       theme: "default",
       largeText: false,
       highContrast: false,
-      autoSave: true,
-      feedbackPrompt: "医療者や家族に見せやすく、短く、次回聞きたいことがあれば最後にまとめる"
+      autoSave: true
     }
   };
   const phrases = raw.phrases
@@ -497,6 +497,18 @@ function eventOccursOn(event, dateKey) {
 function eventSortValue(event) {
   if (event.allDay) return "00:00";
   return event.time || "99:99";
+}
+
+function eventDisplayTitle(event) {
+  return event.name || event.title || "予定";
+}
+
+function eventQaCategory(event) {
+  return qaCategories.includes(event.title) ? event.title : "その他";
+}
+
+function eventQaPerson(event) {
+  return event.place || event.name || event.title || "";
 }
 
 function monthLabel(date) {
@@ -886,6 +898,22 @@ function renderCalendar() {
   }
 }
 
+function openDayDialog() {
+  if (typeof els.dayDialog.showModal === "function" && !els.dayDialog.open) {
+    els.dayDialog.showModal();
+  } else {
+    els.dayDialog.setAttribute("open", "");
+  }
+}
+
+function closeDayDialog() {
+  if (typeof els.dayDialog.close === "function") {
+    els.dayDialog.close();
+  } else {
+    els.dayDialog.removeAttribute("open");
+  }
+}
+
 function renderDayList() {
   const events = state.events
     .filter((event) => eventOccursOn(event, selectedDateKey))
@@ -907,12 +935,16 @@ function renderDayList() {
 
   const eventItems = events.map((event) => {
     const careEvent = isCareEvent(event.title);
-    const shownTitle = event.name || event.title;
+    const shownTitle = eventDisplayTitle(event);
     const time = event.allDay ? "終日・" : event.time ? `${event.time}・` : "";
     const place = event.place ? `・${escapeHtml(event.place)}` : "";
     const repeat = event.repeat && event.repeat !== "none" ? `・${repeatLabels[event.repeat]}` : "";
     const stopped = event.repeatUntil ? `・${event.repeatUntil}まで` : "";
     const memo = event.memo ? `<div class="day-main">${escapeHtml(event.memo)}</div>` : "";
+    const linkedQa = qaRecords.filter((record) => record.eventId === event.id);
+    const linkedQaHtml = linkedQa.length
+      ? `<div class="event-qa-list">${linkedQa.map((record) => renderQaCard(record, { compact: true })).join("")}</div>`
+      : `<div class="event-qa-empty">この予定の聞きたいことはまだありません</div>`;
     const sendButton = careEvent && event.memo
       ? `<button type="button" data-action="send-memo" data-id="${event.id}">記録へ</button>`
       : "";
@@ -926,7 +958,9 @@ function renderDayList() {
           <span>${time}${escapeHtml(shownTitle)}${place}${repeat}${stopped}</span>
         </div>
         ${memo}
+        ${linkedQaHtml}
         <div class="day-actions">
+          <button type="button" data-action="add-qa-event" data-id="${event.id}">聞きたいことを追加</button>
           ${sendButton}
           <button type="button" data-action="edit-event" data-id="${event.id}">編集</button>
           ${stopButton}
@@ -954,7 +988,10 @@ function renderDayList() {
     `;
   });
 
-  const qaItems = qaRecords.map((record) => renderQaCard(record));
+  const linkedEventIds = new Set(events.map((event) => event.id));
+  const qaItems = qaRecords
+    .filter((record) => !record.eventId || !linkedEventIds.has(record.eventId))
+    .map((record) => renderQaCard(record));
   const diaryItems = diaries.map((entry) => renderDiaryCard(entry));
 
   els.dayList.innerHTML = [...eventItems, ...qaItems, ...logItems, ...diaryItems].join("");
@@ -970,12 +1007,13 @@ function kindLabel(kind) {
   return labels[kind] || "記録";
 }
 
-function renderQaCard(record) {
+function renderQaCard(record, options = {}) {
   const meta = [record.date, record.category, record.person].filter(Boolean).join("・");
   const answer = record.answer ? `<div class="qa-answer"><strong>A</strong><p>${escapeHtml(record.answer)}</p></div>` : "";
   const memo = record.memo ? `<div class="qa-memo">${escapeHtml(record.memo)}</div>` : "";
+  const compactClass = options.compact ? " compact-qa" : "";
   return `
-    <article class="qa-item" data-id="${record.id}">
+    <article class="qa-item${compactClass}" data-id="${record.id}">
       <div class="timeline-meta">
         <span class="timeline-kind">聞きたいこと</span>
         <span>${escapeHtml(meta)}</span>
@@ -992,7 +1030,6 @@ function renderQaCard(record) {
 }
 
 function renderDiaryCard(entry) {
-  const feedback = entry.feedback ? `<div class="qa-answer"><strong>振り返り</strong><p>${escapeHtml(entry.feedback)}</p></div>` : "";
   return `
     <article class="qa-item" data-diary-id="${entry.id}">
       <div class="timeline-meta">
@@ -1000,7 +1037,6 @@ function renderDiaryCard(entry) {
         <span>${escapeHtml(entry.date)}</span>
       </div>
       <div class="day-main">${escapeHtml(entry.text)}</div>
-      ${feedback}
       <div class="day-actions">
         <button type="button" data-action="edit-diary" data-id="${entry.id}">編集</button>
         <button class="danger-inline" type="button" data-action="delete-diary" data-id="${entry.id}">削除</button>
@@ -1009,8 +1045,77 @@ function renderDiaryCard(entry) {
   `;
 }
 
+function getDayData(date) {
+  return {
+    date,
+    events: state.events
+      .filter((event) => eventOccursOn(event, date))
+      .sort((a, b) => eventSortValue(a).localeCompare(eventSortValue(b))),
+    qaRecords: state.qaRecords
+      .filter((record) => record.date === date)
+      .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt)),
+    logs: state.logs
+      .filter((log) => toDateKey(new Date(log.createdAt)) === date)
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+    diaries: state.diaryEntries
+      .filter((entry) => entry.date === date)
+      .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt))
+  };
+}
+
+function daySearchText(day) {
+  return [
+    day.date,
+    ...day.events.flatMap((event) => [event.title, event.name, event.place]),
+    ...day.qaRecords.flatMap((record) => [record.category, record.person, record.question, record.answer, record.memo]),
+    ...day.logs.flatMap((log) => [kindLabel(log.kind), log.text, log.visitType, log.person]),
+    ...day.diaries.map((entry) => entry.text)
+  ].filter(Boolean).join(" ");
+}
+
+function dayMatchesFilter(day, filter) {
+  if (filter === "all") return true;
+  if (filter === "event") return day.events.length > 0;
+  if (filter === "qa") return day.qaRecords.length > 0;
+  if (filter === "answered") return day.qaRecords.some((record) => record.answer);
+  if (filter === "message") return day.logs.some((log) => log.kind !== "status");
+  if (filter === "status") return day.logs.some((log) => log.kind === "status");
+  if (filter === "diary") return day.diaries.length > 0;
+  return true;
+}
+
+function renderDaySummaryCard(day) {
+  const eventLine = day.events.length
+    ? `<p><strong>予定</strong>${escapeHtml(day.events.map((event) => eventDisplayTitle(event)).join("、"))}</p>`
+    : "";
+  const qaLine = day.qaRecords.length
+    ? `<p><strong>聞いたこと</strong>${escapeHtml(day.qaRecords.map((record) => record.question).join(" / "))}</p>`
+    : "";
+  const logLine = day.logs.length
+    ? `<p><strong>伝えたこと・体調</strong>${escapeHtml(day.logs.map((log) => log.text).join(" / "))}</p>`
+    : "";
+  const diaryLine = day.diaries.length
+    ? day.diaries.map((entry) => `
+      ${entry.text ? `<p><strong>日記</strong>${escapeHtml(entry.text)}</p>` : ""}
+    `).join("")
+    : "";
+
+  return `
+    <article class="record-day-card" data-record-date="${day.date}">
+      <div class="record-day-head">
+        <h2>${escapeHtml(day.date)}</h2>
+        <button type="button" class="secondary-button compact" data-action="open-day" data-date="${day.date}">開く</button>
+      </div>
+      <div class="record-day-body">
+        ${eventLine || qaLine || logLine || diaryLine ? [eventLine, qaLine, logLine, diaryLine].join("") : "<p>この日の記録はまだ少ないです。</p>"}
+      </div>
+    </article>
+  `;
+}
+
 function resetQaForm(date = toDateKey(new Date())) {
   els.editingQaId.value = "";
+  els.qaEventId.value = "";
   els.qaDate.value = date;
   els.qaCategory.value = "通院";
   els.qaPerson.value = "";
@@ -1018,6 +1123,35 @@ function resetQaForm(date = toDateKey(new Date())) {
   els.qaAnswer.value = "";
   els.qaMemo.value = "";
   els.saveQaRecord.textContent = "Q&Aを保存";
+  els.qaContext.textContent = "予定なしで登録";
+}
+
+function updateQaContext() {
+  const event = state.events.find((item) => item.id === els.qaEventId.value);
+  if (event) {
+    const time = event.allDay ? "終日" : event.time || "時間未定";
+    const place = eventQaPerson(event);
+    const date = els.qaDate.value || event.date;
+    els.qaContext.textContent = `${date} ${time}・${eventDisplayTitle(event)}${place ? `・${place}` : ""} の聞きたいこと`;
+    return;
+  }
+  const date = els.qaDate.value || selectedDateKey;
+  const person = els.qaPerson.value.trim();
+  els.qaContext.textContent = `${date}・予定なし${person ? `・${person}` : ""}`;
+}
+
+function addQaForEvent(id) {
+  const event = state.events.find((item) => item.id === id);
+  if (!event) return;
+  const date = selectedDateKey || event.date;
+  resetQaForm(date);
+  els.qaEventId.value = event.id;
+  els.qaDate.value = date;
+  els.qaCategory.value = eventQaCategory(event);
+  els.qaPerson.value = eventQaPerson(event);
+  updateQaContext();
+  els.qaQuestion.focus();
+  els.qaQuestion.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function saveQaRecord() {
@@ -1030,6 +1164,7 @@ function saveQaRecord() {
   const id = els.editingQaId.value || createId();
   const record = {
     id,
+    eventId: els.qaEventId.value,
     category: els.qaCategory.value,
     date: els.qaDate.value || toDateKey(new Date()),
     person: els.qaPerson.value.trim(),
@@ -1065,6 +1200,7 @@ function editQaRecord(id) {
   const record = state.qaRecords.find((item) => item.id === id);
   if (!record) return;
   els.editingQaId.value = record.id;
+  els.qaEventId.value = record.eventId || "";
   els.qaDate.value = record.date;
   els.qaCategory.value = record.category || "通院";
   els.qaPerson.value = record.person || "";
@@ -1072,6 +1208,7 @@ function editQaRecord(id) {
   els.qaAnswer.value = record.answer || "";
   els.qaMemo.value = record.memo || "";
   els.saveQaRecord.textContent = "変更を保存";
+  updateQaContext();
   selectedDateKey = record.date;
   calendarMonth = startOfMonth(parseDateKey(record.date));
   switchScreen("screenCalendar");
@@ -1100,6 +1237,7 @@ function sendQuestionToQa(question) {
   resetQaForm();
   els.qaQuestion.value = question;
   els.qaDate.value = selectedDateKey;
+  updateQaContext();
   switchScreen("screenCalendar");
   els.qaQuestion.focus();
 }
@@ -1209,6 +1347,7 @@ function saveEvent() {
   }
 
   const index = state.events.findIndex((item) => item.id === event.id);
+  const shouldPrepareQa = index < 0 && qaCategories.includes(event.title);
   if (index >= 0) {
     state.events[index] = {
       ...state.events[index],
@@ -1227,7 +1366,13 @@ function saveEvent() {
   resetEventForm(date);
   renderCalendar();
   renderDayList();
-  showToast("予定を保存しました");
+  if (shouldPrepareQa) {
+    addQaForEvent(event.id);
+    showToast("予定を保存しました。聞きたいことも入力できます");
+  } else {
+    openDayDialog();
+    showToast("予定を保存しました");
+  }
 }
 
 function editEvent(id) {
@@ -1247,7 +1392,8 @@ function editEvent(id) {
   updateEventFormMode();
   renderCalendar();
   renderDayList();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  openDayDialog();
+  els.eventTitle.focus();
 }
 
 function stopEvent(id) {
@@ -1281,12 +1427,12 @@ function deleteEvent(id) {
 function sendEventMemoToQa(id) {
   const event = state.events.find((item) => item.id === id);
   if (!event || !event.memo) return;
-  resetQaForm(event.date);
-  if (qaCategories.includes(event.title)) {
-    els.qaCategory.value = event.title;
-  }
-  els.qaPerson.value = event.place || "";
+  resetQaForm(selectedDateKey || event.date);
+  els.qaEventId.value = event.id;
+  els.qaCategory.value = eventQaCategory(event);
+  els.qaPerson.value = eventQaPerson(event);
   els.qaQuestion.value = event.memo;
+  updateQaContext();
   switchScreen("screenCalendar");
   els.qaQuestion.focus();
   showToast("記録に送りました");
@@ -1353,8 +1499,7 @@ function deleteLog(id) {
 
 function saveDiary() {
   const text = els.diaryText.value.trim();
-  const feedback = els.diaryFeedback.value.trim();
-  if (!text && !feedback) {
+  if (!text) {
     showToast("日記を入力してください");
     return;
   }
@@ -1363,7 +1508,6 @@ function saveDiary() {
     id,
     date: els.diaryDate.value || selectedDateKey,
     text,
-    feedback,
     updatedAt: new Date().toISOString()
   };
   const index = state.diaryEntries.findIndex((item) => item.id === id);
@@ -1384,7 +1528,6 @@ function resetDiaryForm(date = selectedDateKey) {
   els.editingDiaryId.value = "";
   els.diaryDate.value = date;
   els.diaryText.value = "";
-  els.diaryFeedback.value = "";
 }
 
 function editDiary(id) {
@@ -1393,10 +1536,12 @@ function editDiary(id) {
   els.editingDiaryId.value = entry.id;
   els.diaryDate.value = entry.date;
   els.diaryText.value = entry.text || "";
-  els.diaryFeedback.value = entry.feedback || "";
   selectedDateKey = entry.date;
   calendarMonth = startOfMonth(parseDateKey(entry.date));
-  switchScreen("screenLog");
+  switchScreen("screenCalendar");
+  renderCalendar();
+  renderDayList();
+  openDayDialog();
   els.diaryText.focus();
 }
 
@@ -1473,7 +1618,6 @@ function exportReadableText() {
     });
     state.diaryEntries.filter((entry) => entry.date === date).forEach((entry) => {
       if (entry.text) lines.push(`日記: ${entry.text}`);
-      if (entry.feedback) lines.push(`フィードバック: ${entry.feedback}`);
     });
     lines.push("");
   });
@@ -1482,73 +1626,29 @@ function exportReadableText() {
   showToast("テキストを書き出しました");
 }
 
-function generateFeedback() {
-  const date = els.diaryDate.value || selectedDateKey;
-  const logs = state.logs.filter((log) => toDateKey(new Date(log.createdAt)) === date);
-  const qa = state.qaRecords.filter((record) => record.date === date);
-  const events = state.events.filter((event) => eventOccursOn(event, date));
-  const parts = [];
-  if (events.length) parts.push(`予定: ${events.map((event) => event.name || event.title).join("、")}`);
-  if (qa.length) parts.push(`聞きたいこと: ${qa.map((record) => record.question).join(" / ")}`);
-  if (logs.length) parts.push(`伝えたこと・体調: ${logs.map((log) => log.text).join(" / ")}`);
-  if (els.diaryText.value.trim()) parts.push(`メモ: ${els.diaryText.value.trim()}`);
-  const prompt = "医療者や家族に見せやすく、短く、次回聞きたいことがあれば最後にまとめる";
-  els.diaryFeedback.value = [
-    `${date}の振り返り`,
-    prompt ? `方針: ${prompt}` : "",
-    parts.length ? parts.join("\n") : "この日の記録はまだ少ないです。"
-  ].filter(Boolean).join("\n");
-}
-
 function renderRecordResults() {
   const query = (els.recordSearch?.value || "").trim().toLowerCase();
   const filter = els.recordFilter?.value || "all";
   const date = els.recordDate?.value || "";
-  const items = collectRecordItems()
-    .filter((item) => !date || item.date === date)
-    .filter((item) => filter === "all" || item.type === filter || (filter === "answered" && item.type === "qa" && item.answer))
-    .filter((item) => !query || item.searchText.toLowerCase().includes(query))
-    .sort((a, b) => new Date(b.date) - new Date(a.date) || b.sort.localeCompare(a.sort));
+  const dates = new Set([
+    ...state.events.map((event) => event.date),
+    ...state.qaRecords.map((record) => record.date),
+    ...state.logs.map((log) => toDateKey(new Date(log.createdAt))),
+    ...state.diaryEntries.map((entry) => entry.date)
+  ]);
+  const days = [...dates]
+    .map((dayDate) => getDayData(dayDate))
+    .filter((day) => !date || day.date === date)
+    .filter((day) => dayMatchesFilter(day, filter))
+    .filter((day) => !query || daySearchText(day).toLowerCase().includes(query))
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   if (!els.recordResults) return;
-  if (!items.length) {
+  if (!days.length) {
     els.recordResults.innerHTML = `<div class="empty-state">該当する記録はありません</div>`;
     return;
   }
-  els.recordResults.innerHTML = items.map((item) => item.html).join("");
-}
-
-function collectRecordItems() {
-  const eventItems = state.events.map((event) => ({
-    type: "event",
-    date: event.date,
-    sort: event.updatedAt || event.createdAt || event.date,
-    searchText: [event.title, event.name, event.place].filter(Boolean).join(" "),
-    html: renderEventResult(event)
-  }));
-  const qaItems = state.qaRecords.map((record) => ({
-    type: "qa",
-    date: record.date,
-    sort: record.updatedAt || record.createdAt || record.date,
-    answer: record.answer,
-    searchText: [record.category, record.person, record.question, record.answer, record.memo].filter(Boolean).join(" "),
-    html: renderQaCard(record)
-  }));
-  const logItems = state.logs.map((log) => ({
-    type: log.kind === "status" ? "status" : "message",
-    date: toDateKey(new Date(log.createdAt)),
-    sort: log.updatedAt || log.createdAt,
-    searchText: [kindLabel(log.kind), log.text, log.visitType, log.person].filter(Boolean).join(" "),
-    html: renderLogResult(log)
-  }));
-  const diaryItems = state.diaryEntries.map((entry) => ({
-    type: "diary",
-    date: entry.date,
-    sort: entry.updatedAt || entry.createdAt || entry.date,
-    searchText: [entry.text, entry.feedback].filter(Boolean).join(" "),
-    html: renderDiaryCard(entry)
-  }));
-  return [...eventItems, ...qaItems, ...logItems, ...diaryItems];
+  els.recordResults.innerHTML = days.map((day) => renderDaySummaryCard(day)).join("");
 }
 
 function renderEventResult(event) {
@@ -1680,7 +1780,7 @@ function escapeAttr(value) {
 function wireEvents() {
   els.showMessage.addEventListener("click", () => showText(els.messageInput.value, "message"));
   els.saveMessage.addEventListener("click", saveCurrentMessage);
-  els.clearMessage.addEventListener("click", () => {
+  els.clearMessage?.addEventListener("click", () => {
     els.messageInput.value = "";
     els.messageInput.focus();
   });
@@ -1743,12 +1843,30 @@ function wireEvents() {
   });
 
   els.saveStatus.addEventListener("click", saveStatus);
-  els.clearQaForm.addEventListener("click", () => resetQaForm());
+  els.clearQaForm.addEventListener("click", () => {
+    resetQaForm(selectedDateKey);
+    els.qaQuestion.focus();
+  });
+  [els.qaCategory, els.qaPerson].forEach((control) => {
+    control.addEventListener("input", updateQaContext);
+    control.addEventListener("change", updateQaContext);
+  });
   els.saveQaRecord.addEventListener("click", saveQaRecord);
   [els.dayList, els.recordResults].forEach((list) => {
     list.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-action]");
       if (!button) return;
+      if (button.dataset.action === "open-day") {
+        selectedDateKey = button.dataset.date;
+        calendarMonth = startOfMonth(parseDateKey(selectedDateKey));
+        resetEventForm(selectedDateKey);
+        resetQaForm(selectedDateKey);
+        resetDiaryForm(selectedDateKey);
+        switchScreen("screenCalendar");
+        renderCalendar();
+        renderDayList();
+        openDayDialog();
+      }
       if (button.dataset.action === "edit-qa") editQaRecord(button.dataset.id);
       if (button.dataset.action === "delete-qa") deleteQaRecord(button.dataset.id);
       if (button.dataset.action === "edit-diary") editDiary(button.dataset.id);
@@ -1775,10 +1893,17 @@ function wireEvents() {
     resetDiaryForm(selectedDateKey);
     renderCalendar();
     renderDayList();
+    openDayDialog();
   });
   els.newEvent.addEventListener("click", () => {
     resetEventForm(selectedDateKey);
     els.eventTitle.focus();
+  });
+  els.closeDayDialog.addEventListener("click", closeDayDialog);
+  els.dayDialog.addEventListener("click", (event) => {
+    if (event.target === els.dayDialog) {
+      closeDayDialog();
+    }
   });
   els.eventTitle.addEventListener("change", updateEventFormMode);
   els.eventAllDay.addEventListener("change", updateEventFormMode);
@@ -1806,11 +1931,17 @@ function wireEvents() {
       renderRecordResults();
     });
   });
-  els.generateFeedback.addEventListener("click", generateFeedback);
   els.saveDiary.addEventListener("click", saveDiary);
   els.dayList.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
-    if (!button) return;
+    if (!button) {
+      const qaItem = event.target.closest(".qa-item");
+      const eventItem = event.target.closest("[data-event-id]");
+      if (eventItem && !qaItem) {
+        editEvent(eventItem.dataset.eventId);
+      }
+      return;
+    }
     if (button.dataset.action === "edit-event") {
       editEvent(button.dataset.id);
     }
@@ -1822,6 +1953,9 @@ function wireEvents() {
     }
     if (button.dataset.action === "send-memo") {
       sendEventMemoToQa(button.dataset.id);
+    }
+    if (button.dataset.action === "add-qa-event") {
+      addQaForEvent(button.dataset.id);
     }
     if (button.dataset.action === "edit-log") {
       openLogEditor(button.dataset.id);

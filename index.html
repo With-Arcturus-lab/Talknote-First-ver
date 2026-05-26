@@ -23,7 +23,6 @@
           <div class="panel compose-panel">
             <div class="panel-head">
               <h2 id="talkTitle">伝える</h2>
-              <button class="ghost-button" type="button" id="clearMessage">消す</button>
             </div>
 
             <textarea
@@ -94,111 +93,140 @@
             <div class="calendar-grid" id="calendarGrid"></div>
           </section>
 
-          <section class="panel">
-            <div class="panel-head">
-              <h2 id="selectedDateTitle">予定を追加</h2>
-              <button class="secondary-button compact" type="button" id="newEvent">新規</button>
-            </div>
+          <dialog id="dayDialog" class="day-dialog">
+            <div class="day-sheet">
+              <div class="day-sheet-head">
+                <h2 id="selectedDateTitle">予定を追加</h2>
+                <button class="ghost-button compact" type="button" id="closeDayDialog">閉じる</button>
+              </div>
 
-            <div class="event-form">
-              <input type="hidden" id="editingEventId" />
-              <div class="visit-row">
-                <label>
-                  <span>日付</span>
-                  <input id="eventDate" type="date" />
-                </label>
-                <label id="eventTimeField">
-                  <span>時間</span>
-                  <input id="eventTime" type="time" />
-                </label>
-              </div>
-              <div class="visit-row">
-                <label>
-                  <span>予定</span>
-                  <select id="eventTitle">
-                    <option>通院</option>
-                    <option>訪問看護</option>
-                    <option>ヘルパー</option>
-                    <option>リハビリ</option>
-                    <option>家族</option>
-                    <option>誕生日</option>
-                    <option>その他</option>
-                  </select>
-                </label>
-                <label class="care-field">
-                  <span>相手・場所</span>
-                  <input id="eventPlace" type="text" placeholder="病院名、担当者など" autocomplete="off" />
-                </label>
-              </div>
-              <div class="visit-row life-field">
-                <label>
-                  <span>予定名</span>
-                  <input id="eventName" type="text" placeholder="誕生日、家族が来る、外出など" autocomplete="off" />
-                </label>
-                <label>
-                  <span>繰り返し</span>
-                  <select id="eventRepeat">
-                    <option value="none">なし</option>
-                    <option value="daily">毎日</option>
-                    <option value="weekly">毎週</option>
-                    <option value="monthly">毎月</option>
-                    <option value="yearly">毎年</option>
-                  </select>
-                </label>
-              </div>
-              <label class="toggle-line life-field">
-                <span>終日</span>
-                <input type="checkbox" id="eventAllDay" />
-              </label>
-              <button class="primary-button" type="button" id="saveEvent">予定を保存</button>
-            </div>
-          </section>
+              <section class="panel sheet-panel">
+                <div class="panel-head">
+                  <h2>予定</h2>
+                  <button class="secondary-button compact" type="button" id="newEvent">新規</button>
+                </div>
 
-          <section class="panel">
-            <div class="panel-head">
-              <h2>聞きたいこと</h2>
-              <button class="secondary-button compact" type="button" id="clearQaForm">新規</button>
-            </div>
-            <div class="qa-form">
-              <input id="editingQaId" type="hidden" />
-              <div class="visit-row">
-                <label>
-                  <span>カテゴリ</span>
-                  <select id="qaCategory">
-                    <option>通院</option>
-                    <option>訪問看護</option>
-                    <option>ヘルパー</option>
-                    <option>リハビリ</option>
-                    <option>家族</option>
-                    <option>その他</option>
-                  </select>
-                </label>
-                <label>
-                  <span>相手・場所</span>
-                  <input id="qaPerson" type="text" placeholder="病院名、担当者など" autocomplete="off" />
-                </label>
-              </div>
-              <input id="qaDate" type="hidden" />
-              <label>
-                <span>Q 聞きたいこと</span>
-                <textarea id="qaQuestion" rows="3" placeholder="あとで回答を残したい質問"></textarea>
-              </label>
-              <label>
-                <span>A 回答</span>
-                <textarea id="qaAnswer" rows="3" placeholder="聞いた回答、決まったこと"></textarea>
-              </label>
-              <label>
-                <span>メモ</span>
-                <textarea id="qaMemo" rows="2" placeholder="補足メモ"></textarea>
-              </label>
-              <button class="primary-button" type="button" id="saveQaRecord">Q&Aを保存</button>
-            </div>
-          </section>
+                <div class="event-form">
+                  <input type="hidden" id="editingEventId" />
+                  <div class="visit-row event-row event-date-time-row">
+                    <label>
+                      <span>日付</span>
+                      <input id="eventDate" type="date" />
+                    </label>
+                    <label id="eventTimeField">
+                      <span>時間</span>
+                      <input id="eventTime" type="time" />
+                    </label>
+                  </div>
+                  <div class="visit-row event-row">
+                    <label>
+                      <span>予定</span>
+                      <select id="eventTitle">
+                        <option>通院</option>
+                        <option>訪問看護</option>
+                        <option>ヘルパー</option>
+                        <option>リハビリ</option>
+                        <option>家族</option>
+                        <option>誕生日</option>
+                        <option>その他</option>
+                      </select>
+                    </label>
+                    <label class="care-field">
+                      <span>相手・場所</span>
+                      <input id="eventPlace" type="text" placeholder="病院名、担当者など" autocomplete="off" />
+                    </label>
+                  </div>
+                  <div class="visit-row event-row life-field">
+                    <label>
+                      <span>予定名</span>
+                      <input id="eventName" type="text" placeholder="誕生日、家族が来る、外出など" autocomplete="off" />
+                    </label>
+                    <label>
+                      <span>繰り返し</span>
+                      <select id="eventRepeat">
+                        <option value="none">なし</option>
+                        <option value="daily">毎日</option>
+                        <option value="weekly">毎週</option>
+                        <option value="monthly">毎月</option>
+                        <option value="yearly">毎年</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="toggle-line life-field">
+                    <span>終日</span>
+                    <input type="checkbox" id="eventAllDay" />
+                  </label>
+                  <button class="primary-button" type="button" id="saveEvent">予定を保存</button>
+                </div>
+              </section>
 
-          <section class="panel day-panel">
-            <h2>この日の履歴</h2>
-            <div class="day-list" id="dayList" aria-live="polite"></div>
-          </section>
+              <section class="panel sheet-panel">
+                <div class="panel-head">
+                  <h2>聞きたいこと</h2>
+                  <button class="secondary-button compact" type="button" id="clearQaForm">予定なしで追加</button>
+                </div>
+                <div class="qa-form">
+                  <input id="editingQaId" type="hidden" />
+                  <input id="qaEventId" type="hidden" />
+                  <div class="qa-context" id="qaContext">予定なしで登録</div>
+                  <details class="qa-detail-fields">
+                    <summary>カテゴリ・相手を調整</summary>
+                    <div class="visit-row">
+                      <label>
+                        <span>カテゴリ</span>
+                        <select id="qaCategory">
+                          <option>通院</option>
+                          <option>訪問看護</option>
+                          <option>ヘルパー</option>
+                          <option>リハビリ</option>
+                          <option>家族</option>
+                          <option>その他</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>相手・場所</span>
+                        <input id="qaPerson" type="text" placeholder="病院名、担当者など" autocomplete="off" />
+                      </label>
+                    </div>
+                  </details>
+                  <input id="qaDate" type="hidden" />
+                  <label>
+                    <span>Q 聞きたいこと</span>
+                    <textarea id="qaQuestion" rows="3" placeholder="あとで回答を残したい質問"></textarea>
+                  </label>
+                  <label>
+                    <span>A 回答</span>
+                    <textarea id="qaAnswer" rows="3" placeholder="聞いた回答、決まったこと"></textarea>
+                  </label>
+                  <label>
+                    <span>メモ</span>
+                    <textarea id="qaMemo" rows="2" placeholder="補足メモ"></textarea>
+                  </label>
+                  <button class="primary-button" type="button" id="saveQaRecord">Q&Aを保存</button>
+                </div>
+              </section>
+
+              <section class="panel sheet-panel">
+                <div class="panel-head">
+                  <h2>日記</h2>
+                </div>
+                <div class="qa-form">
+                  <input id="editingDiaryId" type="hidden" />
+                  <input id="diaryDate" type="hidden" />
+                  <label>
+                    <span>今日のメモ</span>
+                    <textarea id="diaryText" rows="4" placeholder="できたこと、しんどかったこと、家族や支援者へのメモ"></textarea>
+                  </label>
+                  <button class="primary-button" type="button" id="saveDiary">日記を保存</button>
+                </div>
+              </section>
+
+              <section class="panel sheet-panel day-panel">
+                <h2>この日の履歴</h2>
+                <div class="day-list" id="dayList" aria-live="polite"></div>
+              </section>
+            </div>
+          </dialog>
         </section>
 
         <section class="screen" id="screenLog" aria-labelledby="logTitle">
@@ -230,27 +258,7 @@
             </label>
           </section>
 
-          <section class="panel">
-            <div class="panel-head">
-              <h2>日記・振り返り</h2>
-              <button class="secondary-button compact" type="button" id="generateFeedback">下書き</button>
-            </div>
-            <div class="qa-form">
-              <input id="editingDiaryId" type="hidden" />
-              <input id="diaryDate" type="hidden" />
-              <label>
-                <span>今日のメモ</span>
-                <textarea id="diaryText" rows="4" placeholder="できたこと、しんどかったこと、家族や支援者へのメモ"></textarea>
-              </label>
-              <label>
-                <span>フィードバック</span>
-                <textarea id="diaryFeedback" rows="4" placeholder="下書きボタンで、その日の記録をもとに整理します"></textarea>
-              </label>
-              <button class="primary-button" type="button" id="saveDiary">日記を保存</button>
-            </div>
-          </section>
-
-          <div class="qa-list" id="recordResults" aria-live="polite"></div>
+          <div class="record-day-list" id="recordResults" aria-live="polite"></div>
         </section>
 
         <section class="screen" id="screenSettings" aria-labelledby="settingsTitle">
